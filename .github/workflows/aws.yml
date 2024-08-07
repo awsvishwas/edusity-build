@@ -37,11 +37,15 @@ permissions:
 env:
   AWS_REGION: us-east-1                   # set this to your preferred AWS region, e.g. us-west-1
   ECR_REPOSITORY: aws-ecs-task-test           # set this to your Amazon ECR repository name
+  ECS_SERVICE: aws-ecs-task-service
+  ECS_CLUSTER: aws-ecs-task-test-cluster
+  ECS_TASK_DEFINITION: .aws/task-definition.json
+  CONTAINER_NAME: e-website
 
 #build docker image, push to ECR
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -71,6 +75,21 @@ jobs:
         docker build -t aws-ecs-task-test .
         docker tag aws-ecs-task-test:latest public.ecr.aws/d6l1b7a7/aws-ecs-task-test:latest
         docker push public.ecr.aws/d6l1b7a7/aws-ecs-task-test:latest
+    
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+      with:
+        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.build-image.outputs.image }}
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
 
   
         
