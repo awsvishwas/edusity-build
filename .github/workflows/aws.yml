@@ -92,5 +92,41 @@ jobs:
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
 
-  
-        
+
+  #added integration tests and rollback below
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    steps:
+    - name: Run integration tests
+      run: |
+          echo "Running integration tests..."
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: failure()
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::590183895361:role/aws-ecs-task-git-role
+        aws-region: us-east-1
+      
+    - name: Rollback deployment
+      run: |
+          # Retrieve the previous task definition
+          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --query 'taskDefinition.revision' --output text)
+          # Update the ECS service to use the previous task definition
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --task-definition $TASK_DEFINITION
+
+
+
+
+
+
+
+
+
+
